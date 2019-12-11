@@ -46,6 +46,7 @@ import ch.qos.logback.classic.filter.ThresholdFilter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
+import org.owasp.dependencycheck.utils.SeverityUtil;
 
 /**
  * The command line interface for the DependencyCheck application.
@@ -151,6 +152,7 @@ public class App {
         } else if (cli.isUpdateOnly()) {
             try {
                 populateSettings(cli);
+                settings.setBoolean(Settings.KEYS.AUTO_UPDATE, true);
             } catch (InvalidSettingException ex) {
                 LOGGER.error(ex.getMessage());
                 LOGGER.debug(ERROR_LOADING_PROPERTIES_FILE, ex);
@@ -181,7 +183,7 @@ public class App {
                 final String[] scanFiles = cli.getScanFiles();
                 if (scanFiles != null) {
                     exitCode = runScan(cli.getReportDirectory(), cli.getReportFormat(), cli.getProjectName(), scanFiles,
-                    cli.getExcludeList(), cli.getSymLinkDepth(), cli.getFailOnCVSS());
+                            cli.getExcludeList(), cli.getSymLinkDepth(), cli.getFailOnCVSS());
                 } else {
                     LOGGER.error("No scan files configured");
                 }
@@ -295,8 +297,9 @@ public class App {
             if (!dep.getVulnerabilities().isEmpty()) {
                 for (Vulnerability vuln : dep.getVulnerabilities()) {
                     LOGGER.debug("VULNERABILITY FOUND {}", dep.getDisplayFileName());
-                    if ((vuln.getCvssV2() != null && vuln.getCvssV2().getScore() > cvssFailScore)
-                            || (vuln.getCvssV3() != null && vuln.getCvssV3().getBaseScore() > cvssFailScore)) {
+                    if ((vuln.getCvssV2() != null && vuln.getCvssV2().getScore() >= cvssFailScore)
+                            || (vuln.getCvssV3() != null && vuln.getCvssV3().getBaseScore() >= cvssFailScore)
+                            || (vuln.getUnscoredSeverity() != null && SeverityUtil.estimateCvssV2(vuln.getUnscoredSeverity()) >= cvssFailScore)) {
                         retCode = 1;
                     }
                 }
@@ -396,6 +399,7 @@ public class App {
         final String proxyPort = cli.getProxyPort();
         final String proxyUser = cli.getProxyUsername();
         final String proxyPass = cli.getProxyPassword();
+        final String nonProxyHosts = cli.getNonProxyHosts();
         final String dataDirectory = cli.getDataDirectory();
         final File propertiesFile = cli.getPropertiesFile();
         final String[] suppressionFiles = cli.getSuppressionFiles();
@@ -403,6 +407,8 @@ public class App {
         final String nexusUrl = cli.getNexusUrl();
         final String nexusUser = cli.getNexusUsername();
         final String nexusPass = cli.getNexusPassword();
+        final String ossIndexUser = cli.getOssIndexUsername();
+        final String ossIndexPass = cli.getOssIndexPassword();
         final String databaseDriverName = cli.getDatabaseDriverName();
         final String databaseDriverPath = cli.getDatabaseDriverPath();
         final String connectionString = cli.getConnectionString();
@@ -447,6 +453,7 @@ public class App {
         settings.setStringIfNotEmpty(Settings.KEYS.PROXY_PORT, proxyPort);
         settings.setStringIfNotEmpty(Settings.KEYS.PROXY_USERNAME, proxyUser);
         settings.setStringIfNotEmpty(Settings.KEYS.PROXY_PASSWORD, proxyPass);
+        settings.setStringIfNotEmpty(Settings.KEYS.PROXY_NON_PROXY_HOSTS, nonProxyHosts);
         settings.setStringIfNotEmpty(Settings.KEYS.CONNECTION_TIMEOUT, connectionTimeout);
         settings.setStringIfNotEmpty(Settings.KEYS.HINTS_FILE, hintsFile);
         settings.setIntIfNotNull(Settings.KEYS.CVE_CHECK_VALID_FOR_HOURS, cveValidForHours);
@@ -475,9 +482,11 @@ public class App {
         settings.setBoolean(Settings.KEYS.ANALYZER_NODE_PACKAGE_ENABLED, !cli.isNodeJsDisabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_NODE_AUDIT_ENABLED, !cli.isNodeAuditDisabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_NODE_AUDIT_USE_CACHE, !cli.isNodeAuditCacheDisabled());
+        settings.setBoolean(Settings.KEYS.ANALYZER_NODE_AUDIT_SKIPDEV, cli.isNodeAuditSkipDevDependencies());
         settings.setBoolean(Settings.KEYS.ANALYZER_RETIREJS_ENABLED, !cli.isRetireJSDisabled());
         settings.setBooleanIfNotNull(Settings.KEYS.PRETTY_PRINT, cli.isPrettyPrint());
         settings.setStringIfNotNull(Settings.KEYS.ANALYZER_RETIREJS_REPO_JS_URL, cli.getRetireJSUrl());
+        settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_RETIREJS_FORCEUPDATE, cli.isRetireJSForceUpdate());
         settings.setBoolean(Settings.KEYS.ANALYZER_SWIFT_PACKAGE_MANAGER_ENABLED, !cli.isSwiftPackageAnalyzerDisabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_COCOAPODS_ENABLED, !cli.isCocoapodsAnalyzerDisabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_RUBY_GEMSPEC_ENABLED, !cli.isRubyGemspecDisabled());
@@ -486,6 +495,8 @@ public class App {
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NEXUS_ENABLED, cli.isNexusEnabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_OSSINDEX_ENABLED, !cli.isOssIndexDisabled());
         settings.setBoolean(Settings.KEYS.ANALYZER_OSSINDEX_USE_CACHE, !cli.isOssIndexCacheDisabled());
+        settings.setStringIfNotEmpty(Settings.KEYS.ANALYZER_OSSINDEX_USER, ossIndexUser);
+        settings.setStringIfNotEmpty(Settings.KEYS.ANALYZER_OSSINDEX_PASSWORD, ossIndexPass);
         settings.setFloat(Settings.KEYS.JUNIT_FAIL_ON_CVSS, cli.getJunitFailOnCVSS());
 
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_ARTIFACTORY_ENABLED,
