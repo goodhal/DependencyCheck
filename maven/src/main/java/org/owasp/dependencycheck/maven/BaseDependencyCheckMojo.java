@@ -20,6 +20,8 @@ package org.owasp.dependencycheck.maven;
 import com.github.packageurl.MalformedPackageURLException;
 import com.github.packageurl.PackageURL.StandardTypes;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DefaultArtifact;
+import org.apache.maven.artifact.handler.DefaultArtifactHandler;
 import org.apache.maven.artifact.versioning.ArtifactVersion;
 import org.apache.maven.doxia.sink.Sink;
 import org.apache.maven.execution.MavenSession;
@@ -94,7 +96,10 @@ import org.owasp.dependencycheck.dependency.naming.Identifier;
 import org.owasp.dependencycheck.dependency.naming.PurlIdentifier;
 import org.apache.maven.shared.dependency.graph.traversal.DependencyNodeVisitor;
 import org.apache.maven.shared.dependency.graph.traversal.FilteringDependencyNodeVisitor;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
 import org.owasp.dependencycheck.utils.SeverityUtil;
+import org.owasp.dependencycheck.xml.pom.Model;
+import org.owasp.dependencycheck.xml.pom.PomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.spi.LocationAwareLogger;
@@ -113,6 +118,10 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
      * System specific new line character.
      */
     private static final String NEW_LINE = System.getProperty("line.separator", "\n").intern();
+    /**
+     * Pattern to include all files in a FileSet.
+     */
+    private static final String INCLUDE_ALL = "**/*";
     /**
      * A flag indicating whether or not the Maven site is being generated.
      */
@@ -371,6 +380,12 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
     @SuppressWarnings("CanBeFinal")
     @Parameter(property = "autoconfAnalyzerEnabled")
     private Boolean autoconfAnalyzerEnabled;
+    /**
+     * Sets whether or not the pip Analyzer should be used.
+     */
+    @SuppressWarnings("CanBeFinal")
+    @Parameter(property = "pipAnalyzerEnabled")
+    private Boolean pipAnalyzerEnabled;
     /**
      * Sets whether or not the PHP Composer Lock File Analyzer should be used.
      */
@@ -1029,18 +1044,27 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
 
         final ArtifactType type = session.getRepositorySession().getArtifactTypeRegistry().get(dependency.getType());
         coordinate.setExtension(type.getExtension());
-        coordinate.setClassifier((null == dependency.getClassifier() || dependency.getClassifier().isEmpty()) ? type.getClassifier() : dependency.getClassifier());
-
+        coordinate.setClassifier((null == dependency.getClassifier() || dependency.getClassifier().isEmpty())
+                ? type.getClassifier() : dependency.getClassifier());
         final Artifact artifact = artifactResolver.resolveArtifact(buildingRequest, coordinate).getArtifact();
-
         artifact.setScope(dependency.getScope());
-
         return new DefaultDependencyNode(parent, artifact, dependency.getVersion(), dependency.getScope(), null);
-
     }
 
+    /**
+     * Returns the version from the list of nodes that match the given groupId
+     * and artifactID.
+     *
+     * @param nodes the nodes to search
+     * @param groupId the group id to find
+     * @param artifactId the artifact id to find
+     * @return the version from the list of nodes that match the given groupId
+     * and artifactID; otherwise <code>null</code> is returned
+     */
     private String findVersion(List<DependencyNode> nodes, String groupId, String artifactId) {
-        Optional<DependencyNode> f = nodes.stream().filter(p -> groupId.equals(p.getArtifact().getGroupId()) && artifactId.equals(p.getArtifact().getArtifactId())).findFirst();
+        final Optional<DependencyNode> f = nodes.stream().filter(p
+                -> groupId.equals(p.getArtifact().getGroupId())
+                && artifactId.equals(p.getArtifact().getArtifactId())).findFirst();
         if (f.isPresent()) {
             return f.get().getArtifact().getVersion();
         }
@@ -1050,6 +1074,7 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
     /**
      * Collect dependencies from the dependency management section.
      *
+     * @param engine reference to the ODC engine
      * @param buildingRequest the Maven project building request
      * @param project the project being analyzed
      * @param nodes the list of dependency nodes
@@ -1057,8 +1082,8 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
      * @return a collection of exceptions if any occurred; otherwise
      * <code>null</code>
      */
-    private ExceptionCollection collectDependencyManagementDependencies(ProjectBuildingRequest buildingRequest, MavenProject project,
-            List<DependencyNode> nodes, boolean aggregate) {
+    private ExceptionCollection collectDependencyManagementDependencies(Engine engine, ProjectBuildingRequest buildingRequest,
+            MavenProject project, List<DependencyNode> nodes, boolean aggregate) {
         if (skipDependencyManagement || project.getDependencyManagement() == null) {
             return null;
         }
@@ -1069,10 +1094,23 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
                 nodes.add(toDependencyNode(nodes, buildingRequest, null, dependency));
             } catch (ArtifactResolverException ex) {
                 getLog().debug(String.format("Aggregate : %s", aggregate));
-                if (exCol == null) {
-                    exCol = new ExceptionCollection();
+                boolean addException = true;
+                //CSOFF: EmptyBlock
+                if (!aggregate) {
+                    // do nothing, exception is to be reported
+                } else if (addReactorDependency(engine,
+                        new DefaultArtifact(dependency.getGroupId(), dependency.getArtifactId(),
+                            dependency.getVersion(), dependency.getScope(), dependency.getType(), dependency.getClassifier(),
+                            new DefaultArtifactHandler()))) {
+                    addException = false;
                 }
-                exCol.addException(ex);
+                //CSON: EmptyBlock
+                if (addException) {
+                    if (exCol == null) {
+                        exCol = new ExceptionCollection();
+                    }
+                    exCol.addException(ex);
+                }
             }
         }
         return exCol;
@@ -1094,7 +1132,7 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
     private ExceptionCollection collectMavenDependencies(Engine engine, MavenProject project,
             List<DependencyNode> nodes, ProjectBuildingRequest buildingRequest, boolean aggregate) {
 
-        ExceptionCollection exCol = collectDependencyManagementDependencies(buildingRequest, project, nodes, aggregate);
+        ExceptionCollection exCol = collectDependencyManagementDependencies(engine, buildingRequest, project, nodes, aggregate);
 
         for (DependencyNode dependencyNode : nodes) {
             if (artifactScopeExcluded.passes(dependencyNode.getArtifact().getScope())
@@ -1146,9 +1184,14 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
                     } catch (ArtifactResolverException ex) {
                         getLog().debug(String.format("Aggregate : %s", aggregate));
                         boolean addException = true;
-                        if (!aggregate || addReactorDependency(engine, dependencyNode.getArtifact())) {
+                        //CSOFF: EmptyBlock
+                        if (!aggregate) {
+                            // do nothing - the exception is to be reported
+                        } else if (addReactorDependency(engine, dependencyNode.getArtifact())) {
+                            // successfully resolved as a reactor dependency - swallow the exception
                             addException = false;
                         }
+                        //CSON: //CSOFF: EmptyBlock
                         if (addException) {
                             if (exCol == null) {
                                 exCol = new ExceptionCollection();
@@ -1204,6 +1247,20 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
                     final String msg = String.format("Skipping '%s:%s' in project %s as it uses an `import` scope",
                             dependencyNode.getArtifact().getId(), dependencyNode.getArtifact().getScope(), project.getName());
                     getLog().debug(msg);
+                } else if ("pom".equals(dependencyNode.getArtifact().getType())) {
+
+                    try {
+final                        Dependency d = new Dependency(artifactFile.getAbsoluteFile());
+     final                   Model pom = PomUtils.readPom(artifactFile.getAbsoluteFile());
+                        JarAnalyzer.setPomEvidence(d, pom, null, true);
+                        engine.addDependency(d);
+                    } catch (AnalysisException ex) {
+                        if (exCol == null) {
+                            exCol = new ExceptionCollection();
+                        }
+                        exCol.addException(ex);
+                        getLog().debug("Error reading pom " + artifactFile.getAbsoluteFile(), ex);
+                    }
                 } else {
                     final String msg = String.format("No analyzer could be found for '%s:%s' in project %s",
                             dependencyNode.getArtifact().getId(), dependencyNode.getArtifact().getScope(), project.getName());
@@ -1259,17 +1316,27 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
             final FileSet resourcesSet = new FileSet();
             final FileSet filtersSet = new FileSet();
             final FileSet webappSet = new FileSet();
+            final FileSet mixedLangSet = new FileSet();
             try {
                 resourcesSet.setDirectory(new File(project.getBasedir(), "src/main/resources").getCanonicalPath());
+                resourcesSet.addInclude(INCLUDE_ALL);
                 filtersSet.setDirectory(new File(project.getBasedir(), "src/main/filters").getCanonicalPath());
+                filtersSet.addInclude(INCLUDE_ALL);
                 webappSet.setDirectory(new File(project.getBasedir(), "src/main/webapp").getCanonicalPath());
+                webappSet.addInclude(INCLUDE_ALL);
+                mixedLangSet.setDirectory(project.getBasedir().getCanonicalPath());
+                mixedLangSet.addInclude("package.json");
+                mixedLangSet.addInclude("package-lock.json");
+                mixedLangSet.addInclude("npm-shrinkwrap.json");
+                mixedLangSet.addInclude("Gopkg.lock");
+                mixedLangSet.addInclude("go.mod");
             } catch (IOException ex) {
                 if (exCol == null) {
                     exCol = new ExceptionCollection();
                 }
                 exCol.addException(ex);
             }
-            projectScan = new FileSet[]{resourcesSet, filtersSet, webappSet};
+            projectScan = new FileSet[]{resourcesSet, filtersSet, webappSet, mixedLangSet};
 
         } else if (aggregate) {
             projectScan = new FileSet[scanSet.length];
@@ -1742,6 +1809,7 @@ public abstract class BaseDependencyCheckMojo extends AbstractMojo implements Ma
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_OPENSSL_ENABLED, opensslAnalyzerEnabled);
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_CMAKE_ENABLED, cmakeAnalyzerEnabled);
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_AUTOCONF_ENABLED, autoconfAnalyzerEnabled);
+        settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_PIP_ENABLED, pipAnalyzerEnabled);
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_COMPOSER_LOCK_ENABLED, composerAnalyzerEnabled);
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NODE_PACKAGE_ENABLED, nodeAnalyzerEnabled);
         settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NODE_AUDIT_ENABLED, nodeAuditAnalyzerEnabled);

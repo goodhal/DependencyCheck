@@ -25,7 +25,7 @@ failBuildOnAnyVulnerability | Specific that if any vulnerability is identified, 
 failOnError                 | Whether the build should fail if there is an error executing the dependency-check analysis. | true
 name                        | The name of the report in the site. | dependency-check or dependency-check:aggregate
 outputDirectory             | The location to write the report(s). Note, this is not used if generating the report as part of a `mvn site` build. | 'target'
-scanSet                     | An optional collection of filesets that specify additional files and/or directories to analyze as part of the scan. If not specified, defaults to standard Maven conventions. To specify this via the command line for maven use `-DscanSet.fileSet=['src/main']`. | ['src/main/resources', 'src/main/filters', 'src/main/webapp']
+scanSet                     | An optional collection of filesets that specify additional files and/or directories to analyze as part of the scan. If not specified, defaults to standard Maven conventions. To specify this via the command line for maven use `-DscanSet.fileSet=['src/main']`. Note that the scan sets specified should be relative from the base directory - do not use Maven project variable substitution (e.g. `${project.basedir}/src/webpack`). Using Maven project variable substitution can cause directories to be missed especially when using an aggregate build. | ['src/main/resources', 'src/main/filters', 'src/main/webapp', './package.json', './package-lock.json', './npm-shrinkwrap.json', './Gopkg.lock', './go.mod']
 skip                        | Skips the dependency-check analysis.                       | false
 skipProvidedScope           | Skip analysis for artifacts with Provided Scope.           | false
 skipRuntimeScope            | Skip analysis for artifacts with Runtime Scope.            | false
@@ -75,6 +75,7 @@ rubygemsAnalyzerEnabled       | Sets whether the [experimental](../analyzers/ind
 opensslAnalyzerEnabled        | Sets whether the openssl Analyzer should be used.                                                          | true
 cmakeAnalyzerEnabled          | Sets whether the [experimental](../analyzers/index.html) CMake Analyzer should be used.                    | true
 autoconfAnalyzerEnabled       | Sets whether the [experimental](../analyzers/index.html) autoconf Analyzer should be used.                 | true
+pipAnalyzerEnabled            | Sets whether the [experimental](../analyzers/index.html) pip Analyzer should be used.                      | true
 composerAnalyzerEnabled       | Sets whether the [experimental](../analyzers/index.html) PHP Composer Lock File Analyzer should be used.   | true
 nodeAnalyzerEnabled           | Sets whether the [retired](../analyzers/index.html) Node.js Analyzer should be used.                       | true
 nodeAuditAnalyzerEnabled      | Sets whether the Node Audit Analyzer should be used. This analyzer requires an internet connection.        | true

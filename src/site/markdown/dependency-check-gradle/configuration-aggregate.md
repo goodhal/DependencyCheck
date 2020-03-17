@@ -45,7 +45,7 @@ skipConfigurations   | A list of configurations that will be skipped. This is mu
 scanConfigurations   | A list of configurations that will be scanned, all other configurations are skipped. This is mutually exclusive with the skipConfigurations property. | `[]` which implicitly means all configurations are scanned.
 scanProjects         | A list of projects that will be scanned, all other projects are skipped. The list or projects to skip must include a preceding colon: `scanProjects = [':app']`. This is mutually exclusive with the `skipProjects` property. | `[]` which implicitly means all projects get scanned.
 skipProjects         | A list of projects that will be skipped.  The list or projects to skip must include a preceding colon: `skipProjects = [':sub1']`. This is mutually exclusive with the `scanProjects` property. | `[]` which means no projects are skipped.
-scanSet              | A list of directories that will be scanned for additional dependencies.                                            | ['src/main/resources','src/main/webapp']
+scanSet              | A list of directories that will be scanned for additional dependencies.                                            | ['src/main/resources','src/main/webapp', './package.json', './package-lock.json', './npm-shrinkwrap.json', './Gopkg.lock', './go.mod']
 
 #### Example
 ```groovy
@@ -139,7 +139,7 @@ analyzers    | golangDepEnabled      | Sets whether or not the [experimental](..
 analyzers    | golangModEnabled      | Sets whether or not the [experimental](../analyzers/index.html) Goland Module Analyzer should be used; requies `go` to be installed. | true
 analyzers    | pathToGo              | The path to `go`.                                                                                                 | &nbsp;
 
-#### Additional Analyzer Configuration
+#### Additional Configuration
 
 Config Group | Property              | Description                                                                                                       | Default Value
 -------------|-----------------------|-------------------------------------------------------------------------------------------------------------------|------------------
@@ -161,6 +161,8 @@ retirejs     | filters               | Configures the list of regular expessions
 ossIndex     | enabled               | Sets whether [OSS Index Analyzer](../analyzers/oss-index-analyzer.html) will be used. This analyzer requires an internet connection. | true
 ossIndex     | username              | The optional user name to connect to Sonatype's OSS Index.                                                        | &nbsp;
 ossIndex     | password              | The password or API token to connect to Sonatype's OSS Index.                                                     | &nbsp;
+slack        | enabled               | Whether or not slack notifications are enabled.                                                                   | false
+slack        | webhookUrl            | The custom incoming webhook URL to receive notifications.                                                         | &nbsp;
 
 
 #### Example

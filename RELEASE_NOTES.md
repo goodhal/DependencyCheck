@@ -2,6 +2,26 @@
 
 Please see the [dependency-check google group](https://groups.google.com/forum/#!forum/dependency-check) for the release notes on versions not listed below.
 
+## [Version 5.3.1](https://github.com/jeremylong/DependencyCheck/releases/tag/v5.3.1) (2020-03-10)
+
+### Changes
+
+- Added an experimental PE Analyzer that reads the PE headersof DLL and EXE files; see [#2448](https://github.com/jeremylong/DependencyCheck/pull/2448) and [#2446](https://github.com/jeremylong/DependencyCheck/pull/2446).
+- Lots of bug fixes and updates to false positives and false negatives
+  - You may see a large one time performance hit when updating the database after updating to 5.3.1
+- Full listing of [changes](https://github.com/jeremylong/DependencyCheck/milestone/12?closed=1).
+
+## [Version 5.3.0](https://github.com/jeremylong/DependencyCheck/releases/tag/v5.3.0) (2020-01-15)
+
+### Changes
+
+- Updated the JSON report to include a new field for unscored vulnerabilities (see #2392).
+- Updated the XML report to include a new attribute to flag unscored vulnerabilities (see #2392)
+    - see https://github.com/jeremylong/DependencyCheck/blob/master/core/src/main/resources/schema/dependency-check.2.3.xsd
+- Added an experimental analyzer that will lookup Node libraries in the NVD data feeds (see #1249)
+    - `NpmCPEAnalyzer`, experimental analyzers must be enabled, controlled via property `analyzer.npm.cpe.enabled` which will be exposed as a configuration option in the next release.
+- Full listing of [changes](https://github.com/jeremylong/DependencyCheck/milestone/11?closed=1).
+
 ## [Version 5.2.4](https://github.com/jeremylong/DependencyCheck/releases/tag/v5.2.4) (2019-11-12)
 
 ### Changes

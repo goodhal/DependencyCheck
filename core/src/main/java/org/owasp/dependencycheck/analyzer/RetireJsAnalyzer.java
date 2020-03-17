@@ -135,12 +135,13 @@ public class RetireJsAnalyzer extends AbstractFileTypeAnalyzer {
     @Override
     public boolean accept(File pathname) {
         try {
-            final boolean filesMatched = super.getFilesMatched();
             final boolean accepted = super.accept(pathname);
+            if (accepted && !pathname.exists()) {
+                //file may not yet have been extracted from an archive
+                super.setFilesMatched(true);
+                return true;
+            }
             if (accepted && filters != null && FileContentSearch.contains(pathname, filters)) {
-                if (!filesMatched) {
-                    super.setFilesMatched(filesMatched);
-                }
                 return false;
             }
             return accepted;
@@ -175,7 +176,7 @@ public class RetireJsAnalyzer extends AbstractFileTypeAnalyzer {
         final boolean autoupdate = getSettings().getBoolean(Settings.KEYS.AUTO_UPDATE, true);
         final boolean forceupdate = getSettings().getBoolean(Settings.KEYS.ANALYZER_RETIREJS_FORCEUPDATE, false);
         if (!autoupdate && forceupdate) {
-            RetireJSDataSource ds = new RetireJSDataSource();
+            final RetireJSDataSource ds = new RetireJSDataSource();
             try {
                 ds.update(engine);
             } catch (UpdateException ex) {

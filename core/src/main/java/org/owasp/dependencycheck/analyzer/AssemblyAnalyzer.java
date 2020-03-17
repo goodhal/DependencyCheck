@@ -215,7 +215,7 @@ public class AssemblyAnalyzer extends AbstractFileTypeAnalyzer {
                 dependency.addEvidence(EvidenceType.VERSION, "grokassembly", "ProductVersion", data.getProductVersion(), Confidence.HIGHEST);
             }
             if (!StringUtils.isEmpty(data.getFileVersion())) {
-                dependency.addEvidence(EvidenceType.VERSION, "grokassembly", "FileVersion", data.getFileVersion(), Confidence.HIGHEST);
+                dependency.addEvidence(EvidenceType.VERSION, "grokassembly", "FileVersion", data.getFileVersion(), Confidence.HIGH);
             }
 
             if (data.getFileVersion() != null && data.getProductVersion() != null) {
@@ -257,13 +257,13 @@ public class AssemblyAnalyzer extends AbstractFileTypeAnalyzer {
                     }
                 }
             }
-            if (dependency.getVersion()==null && data.getFileVersion() != null) {
+            if (dependency.getVersion() == null && data.getFileVersion() != null) {
                 final DependencyVersion version = DependencyVersionUtil.parseVersion(data.getFileVersion(), true);
                 if (version != null) {
                     dependency.setVersion(version.toString());
                 }
             }
-            if (dependency.getVersion()==null && data.getProductVersion() != null) {
+            if (dependency.getVersion() == null && data.getProductVersion() != null) {
                 final DependencyVersion version = DependencyVersionUtil.parseVersion(data.getProductVersion(), true);
                 if (version != null) {
                     dependency.setVersion(version.toString());

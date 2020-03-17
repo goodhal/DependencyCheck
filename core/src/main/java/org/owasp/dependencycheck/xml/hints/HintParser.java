@@ -82,8 +82,8 @@ public class HintParser {
      * The schema for the hint XML files.
      */
     private static final String HINT_SCHEMA_1_3 = "schema/dependency-hint.1.3.xsd";
-    
-        /**
+
+    /**
      * The schema for the hint XML files.
      */
     private static final String HINT_SCHEMA_1_4 = "schema/dependency-hint.1.4.xsd";
@@ -147,7 +147,7 @@ public class HintParser {
                 InputStream schemaStream12 = FileUtils.getResourceAsStream(HINT_SCHEMA_1_2);
                 InputStream schemaStream11 = FileUtils.getResourceAsStream(HINT_SCHEMA_1_1)) {
             final HintHandler handler = new HintHandler();
-            final SAXParser saxParser = XmlUtils.buildSecureSaxParser(schemaStream13, schemaStream12, schemaStream11);
+            final SAXParser saxParser = XmlUtils.buildSecureSaxParser(schemaStream14, schemaStream13, schemaStream12, schemaStream11);
             final XMLReader xmlReader = saxParser.getXMLReader();
             xmlReader.setErrorHandler(new HintErrorHandler());
             xmlReader.setContentHandler(handler);

@@ -45,6 +45,7 @@ import javax.json.JsonObject;
 import javax.json.JsonReader;
 import org.owasp.dependencycheck.analyzer.exception.SearchException;
 import org.owasp.dependencycheck.analyzer.exception.UnexpectedAnalysisException;
+import org.owasp.dependencycheck.dependency.Reference;
 import org.owasp.dependencycheck.dependency.VulnerableSoftwareBuilder;
 import org.owasp.dependencycheck.exception.InitializationException;
 import org.owasp.dependencycheck.utils.InvalidSettingException;
@@ -113,22 +114,28 @@ public class NodeAuditAnalyzer extends AbstractNpmAnalyzer {
      */
     @Override
     public void prepareFileTypeAnalyzer(Engine engine) throws InitializationException {
-        LOGGER.debug("Initializing {}", getName());
-        try {
-            searcher = new NodeAuditSearch(getSettings());
-        } catch (MalformedURLException ex) {
-            setEnabled(false);
-            throw new InitializationException("The configured URL to NPM Audit API is malformed", ex);
+        if (!isEnabled() || !getFilesMatched()) {
+            this.setEnabled(false);
+            return;
         }
-        try {
-            final Settings settings = engine.getSettings();
-            final boolean nodeEnabled = settings.getBoolean(Settings.KEYS.ANALYZER_NODE_PACKAGE_ENABLED);
-            if (!nodeEnabled) {
-                LOGGER.warn("The Node Package Analyzer has been disabled; the resulting report will only "
-                        + " contain the known vulnerable dependency - not a bill of materials for the node project.");
+        if (searcher == null) {
+            LOGGER.debug("Initializing {}", getName());
+            try {
+                searcher = new NodeAuditSearch(getSettings());
+            } catch (MalformedURLException ex) {
+                setEnabled(false);
+                throw new InitializationException("The configured URL to NPM Audit API is malformed", ex);
             }
-        } catch (InvalidSettingException ex) {
-            throw new InitializationException("Unable to read configuration settings", ex);
+            try {
+                final Settings settings = engine.getSettings();
+                final boolean nodeEnabled = settings.getBoolean(Settings.KEYS.ANALYZER_NODE_PACKAGE_ENABLED);
+                if (!nodeEnabled) {
+                    LOGGER.warn("The Node Package Analyzer has been disabled; the resulting report will only "
+                            + "contain the known vulnerable dependency - not a bill of materials for the node project.");
+                }
+            } catch (InvalidSettingException ex) {
+                throw new InitializationException("Unable to read configuration settings", ex);
+            }
         }
     }
 
@@ -233,8 +240,31 @@ public class NodeAuditAnalyzer extends AbstractNpmAnalyzer {
                 nodeModule.addVulnerability(vuln);
                 engine.addDependency(nodeModule);
             } else {
-                existing.addVulnerability(vuln);
+                replaceOrAddVulnerability(existing, vuln);
             }
+        }
+    }
+
+    /**
+     * Evaluates if the vulnerability is already present; if it is the
+     * vulnerability is not added.
+     *
+     * @param dependency a reference to the dependency being analyzed
+     * @param vuln the vulnerability to add
+     */
+    private void replaceOrAddVulnerability(Dependency dependency, Vulnerability vuln) {
+        boolean found = false;
+        for (Vulnerability existing : dependency.getVulnerabilities()) {
+            for (Reference ref : existing.getReferences()) {
+                if (ref.getName() != null
+                        && vuln.getSource().toString().equals("NPM")
+                        && ref.getName().equals("https://nodesecurity.io/advisories/" + vuln.getName())) {
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            dependency.addVulnerability(vuln);
         }
     }
 
